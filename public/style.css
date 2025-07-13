@@ -1,0 +1,109 @@
+/* style.css */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+    background-size: cover;
+    background-position: center;
+    transition: background-image 1s ease-in-out;
+}
+
+body.day { background-image: url('day-sky.png'); }
+body.night { background-image: url('night-sky.png'); color: #eee; }
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+h1, h2, h3, h4 { color: #f0e68c; }
+h1 { font-size: 2.5em; }
+
+input[type="text"] {
+    padding: 10px;
+    margin: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 250px;
+}
+
+button {
+    padding: 10px 20px;
+    background-color: #f0e68c;
+    color: #333;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    margin: 10px 5px;
+    transition: background-color 0.3s;
+}
+button:hover { background-color: #fffacd; }
+button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+
+.rules, .join-form, #profile-setup, #main-game-area > div {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid #f0e68c;
+    border-radius: 8px;
+}
+
+ul { list-style-type: none; padding: 0; }
+li { margin: 8px 0; }
+
+#playerList { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.player-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: 1px solid #aaa;
+    transition: opacity 0.3s ease-in-out;
+}
+.player-card.is-host { border-color: #f0e68c; font-weight: bold; }
+.player-card.has-profile { background: rgba(144, 238, 144, 0.2); }
+.player-card.disconnected { opacity: 0.5; font-style: italic; border-style: dashed; }
+
+#game-screen { display: none; grid-template-areas: "header header" "info main" "players main" "action action"; grid-template-columns: 250px 1fr; gap: 20px; }
+#game-screen.active { display: grid; }
+#game-header { grid-area: header; }
+#player-info-area { grid-area: info; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 8px; }
+#main-game-area { grid-area: main; }
+#players-display-area { grid-area: players; }
+#action-area { grid-area: action; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; }
+
+body.day #game-day,
+body.day #player-info-area h3,
+body.day #player-info-area p {
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+#game-day { font-weight: bold; }
+#crime-report-area { text-align: left; }
+
+#game-player-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.game-player { padding: 15px; background: rgba(0, 0, 0, 0.7); border: 1px solid #777; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.game-player.disconnected { opacity: 0.5; font-style: italic; border-style: dashed; cursor: not-allowed; }
+.game-player:hover { border-color: #f0e68c; transform: translateY(-2px); }
+.game-player.selected { border-color: #ff4500; background-color: #5d2a13; }
+
+#modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 100; }
+.hidden { display: none !important; }
+#modal-content { display: contents; }
+.modal-panel { background: #2c2c2c; padding: 30px; border-radius: 10px; border: 2px solid #f0e68c; min-width: 400px; max-width: 90%; }
+
+#role-spinner { font-size: 2.5em; font-weight: bold; color: #f0e68c; padding: 20px; margin: 20px 0; border: 2px dashed #888; min-height: 60px; display: flex; align-items: center; justify-content: center; transition: opacity 0.1s ease-in-out; }
+#revealed-role-name { font-size: 2.2em; color: #fffacd; margin-bottom: 10px; }
+#revealed-role-desc { font-size: 1.1em; line-height: 1.5; max-width: 400px; margin: 0 auto 20px auto; }
+
+/* End Screen Readability Fix */
+#end-screen-panel {
+    max-width: 700px;
+    margin: 20px auto;
+    padding: 20px 30px;
+    background-color: rgba(0, 0, 0, 0.75);
+    border: 1px solid #f0e68c;
+    border-radius: 8px;
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nothing Good Happens After Midnight</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Home Screen -->
+    <div id="home-screen" class="screen active">
+        <h1>Nothing Good Happens After Midnight</h1>
+        <div class="rules">
+            <h2>The Premise</h2>
+            <p>A priceless item has been stolen. A team of Detectives must find the Thief before they sell it to the Fencer. But with everyone's identity hidden, who can you trust?</p>
+            <h2>The Roles</h2>
+            <ul>
+                <li><strong>Collector (Good):</strong> Knows the truth about the stolen item. Can send one real clue.</li>
+                <li><strong>Detective (Good):</strong> Tries to identify the Thief by tailing players at night.</li>
+                <li><strong>Thief (Bad):</strong> Tries to frame an innocent player by planting false evidence.</li>
+                <li><strong>Fencer (Bad):</strong> Helps the Thief by spreading false rumors and causing chaos.</li>
+            </ul>
+             <h2>Objective</h2>
+             <p><strong>Good Team:</strong> Identify and vote for a Thief. <br> <strong>Bad Team:</strong> Deceive everyone and get an innocent player voted out.</p>
+        </div>
+        <div class="join-form">
+            <input type="text" id="playerName" placeholder="Enter Your Name">
+            <button id="createGameBtn">Create Game</button>
+            <div class="join-existing">
+                <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
+                <button id="joinGameBtn">Join Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen">
+        <h2>Lobby</h2>
+        <h3>Room Code: <span id="roomCodeDisplay"></span></h3>
+        <h4>Players in Lobby:</h4>
+        <ul id="playerList"></ul>
+        <div id="profile-setup">
+            <h4>Your Profile</h4>
+            <p>This info will be used to generate clues and rumors.</p>
+            <input type="text" id="occupation" placeholder="Your real-life Occupation">
+            <input type="text" id="hobby" placeholder="Your real-life Hobby">
+            <input type="text" id="shoes" placeholder="Your Favorite Shoes">
+            <input type="text" id="clothing" placeholder="Your Go-To Clothing">
+            <button id="submitProfileBtn">Save Profile</button>
+        </div>
+        <button id="startGameBtn" disabled>Start Game (Host Only)</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+        <div id="game-header">
+            <h1 id="game-day">Day 1</h1>
+        </div>
+        <div id="player-info-area">
+            <h3><span id="my-player-name"></span>: <span id="my-role"></span> (<span id="my-team"></span> Team)</h3>
+            <p id="my-objective"></p>
+        </div>
+        <div id="main-game-area">
+            <div id="crime-report-area">
+                <h4>Official Crime Report</h4>
+                <p id="crime-report-text">Waiting for Collector...</p>
+            </div>
+            <div id="clue-dossier-area">
+                <h4>Morning Report: Clue Dossier</h4>
+                <ul id="clue-list"></ul>
+            </div>
+            <div id="discussion-area">
+                <h4>Afternoon Activity: <span id="activity-title"></span></h4>
+                <p id="activity-desc"></p>
+            </div>
+        </div>
+        <div id="players-display-area">
+            <h4>Players in Game</h4>
+            <div id="game-player-list"></div>
+        </div>
+        <div id="action-area"></div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="screen">
+        <div id="end-screen-panel">
+            <h1 id="voted-out-announcement"></h1>
+            <h2 id="voted-out-role"></h2>
+            <h2 id="winner-announcement"></h2>
+            <div id="end-game-summary">
+                <h4>Game Summary</h4>
+                <p id="final-clues"></p>
+                <h4>All Roles Revealed</h4>
+                <ul id="all-roles-list"></ul>
+            </div>
+        </div>
+        <button id="playAgainBtn">Play Again (Host Only)</button>
+    </div>
+
+    <!-- Popups / Modals -->
+    <div id="modal-backdrop" class="hidden">
+        <div id="modal-content">
+            <div id="collector-prompt" class="modal-panel hidden">
+                <h3>You are the Collector!</h3>
+                <p>Describe a real, prized possession you own. This will be the "stolen item".</p>
+                <input type="text" id="item-description" placeholder="e.g., My grandfather's old leather journal">
+                <p>Now, provide three true details about it. One will be revealed each day.</p>
+                <input type="text" class="item-clue" placeholder="Clue 1: e.g., It has a leather strap">
+                <input type="text" class="item-clue" placeholder="Clue 2: e.g., The initials 'A.B.' are on the front">
+                <input type="text" class="item-clue" placeholder="Clue 3: e.g., There's a coffee stain on the back cover">
+                <button id="submit-item-btn">Submit Report</button>
+            </div>
+            <div id="role-reveal-modal" class="modal-panel hidden">
+                <h3>The Wheel of Fate is Spinning...</h3>
+                <div id="role-spinner">Detective</div>
+                <div id="role-reveal-content" class="hidden">
+                    <h4>Your Role Is...</h4>
+                    <h2 id="revealed-role-name"></h2>
+                    <p id="revealed-role-desc"></p>
+                    <button id="role-acknowledged-btn">Continue</button>
+                </div>
+            </div>
+            <div id="private-message-popup" class="modal-panel hidden">
+                <h3>Private Message</h3>
+                <p id="private-message-text"></p>
+                <button id="close-popup-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
