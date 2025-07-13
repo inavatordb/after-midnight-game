@@ -57,6 +57,7 @@ function createMorningReport(game) {
     }
 
     const shuffledReport = report.sort(() => 0.5 - Math.random());
+    // *** THIS IS THE CORRECTED LINE ***
     game.dossier.push(...shuffledReport);
     return shuffledReport;
 }
