@@ -35,19 +35,14 @@ function assignRoles(players) {
 }
 
 function createMorningReport(game) {
-    // Anonymized truth clue
     const clueForToday = game.stolenItemClues[game.day - 1] || game.stolenItemClues[0];
     const truth = `A key detail has emerged: "${clueForToday}".`;
-    
-    // Lies from night actions
     const lies = game.nightActions.filter(action => action.lie).map(action => action.lie);
-    
     const report = [truth];
     if (lies.length > 0) {
         const randomLie = lies[Math.floor(Math.random() * lies.length)];
         report.push(randomLie);
     } else {
-        // Varied "quiet night" messages
         const quietNightMessages = [
             "An eerie silence hangs over the city. It's hard to know who to trust when everyone is being so quiet.",
             "The underworld was suspiciously calm last night. Some are laying low, but who?",
@@ -55,9 +50,7 @@ function createMorningReport(game) {
         ];
         report.push(quietNightMessages[Math.floor(Math.random() * quietNightMessages.length)]);
     }
-
     const shuffledReport = report.sort(() => 0.5 - Math.random());
-    // *** THIS IS THE CORRECTED LINE ***
     game.dossier.push(...shuffledReport);
     return shuffledReport;
 }
@@ -123,7 +116,7 @@ io.on('connection', (socket) => {
 
     socket.on('startGame', (roomCode) => {
         const game = games[roomCode];
-        if (game && game.hostId === socket.id && Object.keys(game.players).filter(id => !game.players[id].disconnected).length >= 4) {
+        if (game && game.hostId === socket.id && Object.values(game.players).filter(p => !p.disconnected).length >= 4) {
             game.state = 'setup';
             assignRoles(game.players);
             Object.values(game.players).forEach(p => io.to(p.id).emit('roleAssigned', p));
@@ -274,7 +267,11 @@ io.on('connection', (socket) => {
             }
         });
         const votedOutPlayer = game.players[votedOutId];
-        let winner = isTie ? 'Bad Team' : (votedOutPlayer && votedOutPlayer.role.includes('Thief') ? 'Good Team' : 'Bad Team');
+        // More robust winner logic
+        let winner = 'Bad Team'; // Default winner
+        if (!isTie && votedOutPlayer && votedOutPlayer.role && votedOutPlayer.role.includes('Thief')) {
+            winner = 'Good Team';
+        }
         const allClues = `The stolen item was: ${game.stolenItem}. The true clues were: ${game.stolenItemClues.join(', ')}.`;
         const result = { winner, votedOutPlayer, isTie, allClues, players: Object.values(game.players) };
         io.to(roomCode).emit('gameOver', result);
