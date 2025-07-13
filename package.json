@@ -1,18 +1,21 @@
 {
   "name": "after-midnight",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "An online social deduction game called Nothing Good Happens After Midnight.",
+  "main": "server.js",
   "scripts": {
-  "start": "node server.js",
-  "test": "echo \"Error: no test specified\" && exit 1"
-},
-  "keywords": [],
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "game",
+    "socket.io",
+    "social-deduction"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
-    "express": "^5.1.0",
-    "socket.io": "^4.8.1"
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
   }
-  
 }
