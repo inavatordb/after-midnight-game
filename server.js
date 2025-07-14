@@ -60,24 +60,26 @@ io.on('connection', (socket) => {
 
     socket.on('createGame', ({ playerName }) => {
         const roomCode = generateRoomCode();
-        games[roomCode] = {
+        const newGame = {
             roomCode, players: {}, hostId: socket.id, state: 'lobby', day: 1,
-            stolenItem: null, stolenItemClues: [], dossier: [], nightActions: [], votes: {},
+            stolenItem: null, stolenItemClues: [], dossier: [], nightActions: [], votes: {}, morningReport: []
         };
-        const game = games[roomCode];
-        game.players[socket.id] = { id: socket.id, name: playerName, profile: null, role: null, isAlive: true, disconnected: false };
+        newGame.players[socket.id] = { id: socket.id, name: playerName, profile: null, role: null, team: null, isAlive: true, disconnected: false };
+        games[roomCode] = newGame;
         socket.join(roomCode);
-        socket.emit('gameCreated', { roomCode, game });
-        io.to(roomCode).emit('updateGame', game);
+        socket.emit('gameCreated', { roomCode, game: newGame });
     });
 
     socket.on('joinGame', ({ roomCode, playerName }) => {
         const game = games[roomCode];
         if (game && game.state === 'lobby') {
-            game.players[socket.id] = { id: socket.id, name: playerName, profile: null, role: null, isAlive: true, disconnected: false };
+            const newPlayer = { id: socket.id, name: playerName, profile: null, role: null, team: null, isAlive: true, disconnected: false };
+            game.players[socket.id] = newPlayer;
             socket.join(roomCode);
+            // Send full state to the new joiner ONLY
             socket.emit('joinedGame', { roomCode, game });
-            io.to(roomCode).emit('updateGame', game);
+            // Send just the new player data to everyone else
+            socket.to(roomCode).emit('playerJoined', newPlayer);
         } else {
             socket.emit('error', 'Game not found or has already started.');
         }
@@ -86,20 +88,24 @@ io.on('connection', (socket) => {
     socket.on('rejoinGame', ({ roomCode, playerId }) => {
         const game = games[roomCode];
         if (game) {
-            const player = Object.values(game.players).find(p => p.id === playerId);
-            if (player) {
-                const oldId = player.id;
+            const playerEntry = Object.entries(game.players).find(([id, p]) => id === playerId);
+            if (playerEntry) {
+                const [oldId, player] = playerEntry;
                 player.id = socket.id;
                 player.disconnected = false;
                 game.players[socket.id] = player;
-                delete game.players[oldId];
+                if (oldId !== socket.id) {
+                   delete game.players[oldId];
+                }
                 if (game.hostId === oldId) {
                     game.hostId = socket.id;
                 }
                 console.log(`Player ${player.name} reconnected with new ID ${socket.id}`);
                 socket.join(roomCode);
-                socket.emit('updateGame', game);
-                io.to(roomCode).emit('updateGame', game);
+                // Send the full game state to the rejoining player
+                socket.emit('gameRejoined', game);
+                // Inform others of the ID change and reconnection status
+                io.to(roomCode).emit('playerReconnected', { oldId, newId: socket.id, newHostId: game.hostId });
             }
         } else {
             socket.emit('error', 'Could not find the game you were in.');
@@ -110,7 +116,8 @@ io.on('connection', (socket) => {
         const game = games[roomCode];
         if (game && game.players[socket.id]) {
             game.players[socket.id].profile = profile;
-            io.to(roomCode).emit('updateGame', game);
+            // Send only the updated profile to everyone
+            io.to(roomCode).emit('playerProfileUpdated', { playerId: socket.id, profile });
         }
     });
 
@@ -119,10 +126,14 @@ io.on('connection', (socket) => {
         if (game && game.hostId === socket.id && Object.values(game.players).filter(p => !p.disconnected).length >= 4) {
             game.state = 'setup';
             assignRoles(game.players);
-            Object.values(game.players).forEach(p => io.to(p.id).emit('roleAssigned', p));
+            // Send each player their specific role privately
+            Object.values(game.players).forEach(p => {
+                io.to(p.id).emit('roleAssigned', { role: p.role, team: p.team });
+            });
+            // Tell everyone the game is starting so they can switch screens
+            io.to(roomCode).emit('gameStarting', { players: game.players }); // Send player list with teams
             const collector = Object.values(game.players).find(p => p.role === 'Collector');
             if (collector) io.to(collector.id).emit('promptCollectorForItem');
-            io.to(roomCode).emit('updateGame', game);
         } else {
              socket.emit('error', 'Need at least 4 active players to start.');
         }
@@ -137,7 +148,12 @@ io.on('connection', (socket) => {
             game.morningReport = [initialClue];
             game.dossier.push(initialClue);
             game.state = 'day';
-            io.to(roomCode).emit('updateGame', game);
+            // Announce the start of Day 1
+            io.to(roomCode).emit('dayStarted', {
+                day: game.day,
+                stolenItem: game.stolenItem,
+                morningReport: game.morningReport
+            });
         }
     });
 
@@ -146,6 +162,7 @@ io.on('connection', (socket) => {
         const player = game.players[socket.id];
         if (!game || !player || game.state !== 'night') return;
         let nightAction = { actorId: socket.id, actorRole: player.role, targetId: targetId };
+        // Generate lies only if a target is selected
         if (player.role === 'Thief' && targetId) {
             const target = game.players[targetId];
             nightAction.lie = `A strange piece of evidence points to someone with a hobby of ${target.profile.hobby}.`;
@@ -155,15 +172,26 @@ io.on('connection', (socket) => {
         }
         game.nightActions.push(nightAction);
         socket.emit('actionConfirmed');
-        const playersWithNightActions = Object.values(game.players).filter(p => ['Thief', 'Fencer', 'Detective', 'Collector'].includes(p.role) && !p.disconnected);
+        const playersWithNightActions = Object.values(game.players).filter(p => ['Thief', 'Fencer', 'Detective', 'Collector'].includes(p.role) && !p.disconnected && p.isAlive);
         if (game.nightActions.length >= playersWithNightActions.length) {
             processNight(roomCode);
+        }
+    });
+    
+    socket.on('endDay', (roomCode) => {
+        const game = games[roomCode];
+        if (game && (game.hostId === socket.id || game.day > 4) && game.state === 'day') {
+            game.state = 'night';
+            io.to(roomCode).emit('nightStarted', { day: game.day });
         }
     });
 
     socket.on('startVote', (roomCode) => {
         const game = games[roomCode];
-        if (game && game.hostId === socket.id) { game.state = 'vote'; io.to(roomCode).emit('updateGame', game); }
+        if (game && game.hostId === socket.id) { 
+            game.state = 'vote'; 
+            io.to(roomCode).emit('voteStarted'); 
+        }
     });
 
     socket.on('submitVote', ({ roomCode, votedPlayerId }) => {
@@ -171,8 +199,8 @@ io.on('connection', (socket) => {
         if (game && game.state === 'vote' && game.players[socket.id]) {
             game.votes[socket.id] = votedPlayerId;
             socket.emit('voteConfirmed');
-            const activePlayers = Object.values(game.players).filter(p => !p.disconnected);
-            if (Object.keys(game.votes).length === activePlayers.length) {
+            const activePlayers = Object.values(game.players).filter(p => !p.disconnected && p.isAlive);
+            if (Object.keys(game.votes).length >= activePlayers.length) {
                 endGame(roomCode);
             }
         }
@@ -181,31 +209,38 @@ io.on('connection', (socket) => {
     socket.on('playAgain', (roomCode) => {
         const game = games[roomCode];
         if (game && game.hostId === socket.id) {
-            const players = game.players;
-            Object.values(players).forEach(p => { p.role = null; p.team = null; });
-            games[roomCode] = { ...game, players, state: 'lobby', day: 1, stolenItem: null, stolenItemClues: [], nightActions: [], votes: {} };
-            io.to(roomCode).emit('gameReset', games[roomCode]);
+            const oldPlayers = game.players;
+            const newGame = {
+                 ...games[roomCode], 
+                 state: 'lobby', day: 1, stolenItem: null, stolenItemClues: [], 
+                 nightActions: [], votes: {}, dossier: [], morningReport: [] 
+            };
+            Object.values(newGame.players).forEach(p => { p.role = null; p.team = null; });
+            games[roomCode] = newGame;
+            io.to(roomCode).emit('gameReset', newGame);
         }
     });
 
     socket.on('disconnect', () => {
         console.log('A user disconnected:', socket.id);
         for (const roomCode in games) {
-            if (games[roomCode].players[socket.id]) {
-                const game = games[roomCode];
+            const game = games[roomCode];
+            if (game.players[socket.id]) {
                 const player = game.players[socket.id];
                 player.disconnected = true;
-                io.to(roomCode).emit('updateGame', game);
-                console.log(`Player ${player.name} in room ${roomCode} marked as disconnected.`);
+                let newHostId = game.hostId;
+
                 if (game.hostId === socket.id) {
                     const activePlayers = Object.values(game.players).filter(p => !p.disconnected);
                     if (activePlayers.length > 0) {
-                        game.hostId = activePlayers[0].id;
-                        io.to(roomCode).emit('updateGame', game);
+                        newHostId = activePlayers[0].id;
+                        game.hostId = newHostId;
                     } else {
                         delete games[roomCode];
+                        return; // Game is over, no need to update
                     }
                 }
+                io.to(roomCode).emit('playerDisconnected', { playerId: socket.id, newHostId });
                 break;
             }
         }
@@ -214,12 +249,12 @@ io.on('connection', (socket) => {
     function processNight(roomCode) {
         const game = games[roomCode];
         if (!game) return;
+        // Private message logic remains the same
         const detectiveAction = game.nightActions.find(a => a.actorRole === 'Detective' && a.targetId);
         if (detectiveAction) {
             const targetPlayer = game.players[detectiveAction.targetId];
             let message = `You tailed ${targetPlayer.name}. `;
-            if (targetPlayer.role === 'Collector') {
-                message += 'Nothing eventful seemed to occur.';
+            if (targetPlayer.role === 'Collector') { message += 'Nothing eventful seemed to occur.';
             } else {
                 const targetAction = game.nightActions.find(a => a.actorId === detectiveAction.targetId && (a.actorRole === 'Thief' || a.actorRole === 'Fencer') && a.targetId);
                 message += targetAction ? 'They made a suspicious move last night!' : 'They laid low last night.';
@@ -234,21 +269,22 @@ io.on('connection', (socket) => {
             io.to(collectorAction.actorId).emit('privateMessage', message);
             io.to(collectorAction.targetId).emit('privateMessage', recipientMessage);
         }
+        
         game.day++;
-        game.state = game.day > 4 ? 'vote' : 'day';
-        if(game.state === 'day') game.morningReport = createMorningReport(game);
+        if (game.day > 4) {
+            game.state = 'vote';
+            io.to(roomCode).emit('voteStarted');
+        } else {
+            game.state = 'day';
+            game.morningReport = createMorningReport(game);
+            io.to(roomCode).emit('dayStarted', {
+                day: game.day,
+                morningReport: game.morningReport
+            });
+        }
         game.nightActions = [];
         game.votes = {};
-        io.to(roomCode).emit('updateGame', game);
     }
-    
-    socket.on('endDay', (roomCode) => {
-        const game = games[roomCode];
-        if (game && (game.hostId === socket.id || game.day > 4) && game.state === 'day') {
-            game.state = 'night';
-            io.to(roomCode).emit('updateGame', game);
-        }
-    });
 
     function endGame(roomCode) {
         const game = games[roomCode];
@@ -257,7 +293,7 @@ io.on('connection', (socket) => {
         const voteCounts = {};
         Object.values(game.votes).forEach(votedId => { voteCounts[votedId] = (voteCounts[votedId] || 0) + 1; });
         let maxVotes = 0, votedOutId = null, isTie = false;
-        Object.keys(voteCounts).forEach(playerId => {
+        for (const playerId in voteCounts) {
             if (voteCounts[playerId] > maxVotes) {
                 maxVotes = voteCounts[playerId];
                 votedOutId = playerId;
@@ -265,13 +301,17 @@ io.on('connection', (socket) => {
             } else if (voteCounts[playerId] === maxVotes) {
                 isTie = true;
             }
-        });
-        const votedOutPlayer = game.players[votedOutId];
-        // More robust winner logic
-        let winner = 'Bad Team'; // Default winner
-        if (!isTie && votedOutPlayer && votedOutPlayer.role && votedOutPlayer.role.includes('Thief')) {
-            winner = 'Good Team';
         }
+        const votedOutPlayer = votedOutId ? game.players[votedOutId] : null;
+
+        // FIXED: Correct winner logic based on TEAM
+        let winner = 'Bad Team'; // Default winner
+        if (isTie) {
+            winner = 'Bad Team'; // Bad team wins on a tie
+        } else if (votedOutPlayer && votedOutPlayer.team === 'Bad') {
+            winner = 'Good Team'; // Good team wins if they vote out any bad player
+        }
+
         const allClues = `The stolen item was: ${game.stolenItem}. The true clues were: ${game.stolenItemClues.join(', ')}.`;
         const result = { winner, votedOutPlayer, isTie, allClues, players: Object.values(game.players) };
         io.to(roomCode).emit('gameOver', result);
